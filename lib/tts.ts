@@ -43,6 +43,46 @@ export async function generateVoiceover(
   }
 }
 
+export function isRendererTtsAvailable() {
+  return Boolean(process.env.VIDEO_RENDERER_URL && process.env.VIDEO_RENDERER_TOKEN);
+}
+
+export async function generateVoiceoverFromRenderer(
+  script: string,
+  language: ReviewScript["language"],
+): Promise<VoiceoverResult> {
+  const baseUrl = process.env.VIDEO_RENDERER_URL!.replace(/\/+$/, "");
+  const ttsUrl = baseUrl.endsWith("/tts") ? baseUrl : `${baseUrl}/tts`;
+
+  const response = await fetch(ttsUrl, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${process.env.VIDEO_RENDERER_TOKEN}`,
+    },
+    body: JSON.stringify({
+      script: compressForVoiceover(script, language),
+      language,
+      targetDurationSeconds: 15,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Renderer TTS failed with status ${response.status}.`);
+  }
+
+  const result = (await response.json()) as RemoteVoiceoverResponse;
+
+  if (!result.audioUrl) {
+    throw new Error("Renderer TTS response must include audioUrl.");
+  }
+
+  return {
+    audioUrl: result.audioUrl,
+    provider: result.provider ?? "renderer:edge-tts",
+  };
+}
+
 export function isCloudTtsConfigured() {
   return Boolean(process.env.TTS_ENDPOINT_URL && process.env.TTS_API_KEY);
 }

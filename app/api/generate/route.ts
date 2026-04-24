@@ -4,7 +4,7 @@ import { createSceneImages } from "@/lib/ffmpeg";
 import { mediaRuntimeUnsupportedResponse } from "@/lib/deployment";
 import { createVideoJob, markJobStep, updateVideoJob } from "@/lib/jobs";
 import { defaultTemplateId, getVideoTemplate } from "@/lib/templates";
-import { generateVoiceover } from "@/lib/tts";
+import { generateVoiceover, generateVoiceoverFromRenderer, isRendererTtsAvailable } from "@/lib/tts";
 import { isRemoteVideoRendererConfigured, renderVideo } from "@/lib/video-renderer";
 import type { GeneratePipelineInput } from "@/types/video";
 
@@ -58,9 +58,11 @@ export async function POST(request: Request) {
 
       currentStep = "voice";
       markJobStep(job.id, "voice", "processing");
-      const voiceover = await generateVoiceover([script.hook, ...script.socialProof, script.cta].join(" "), {
-        language: script.language,
-      });
+      const voiceover = isRemoteVideoRendererConfigured()
+        ? isRendererTtsAvailable()
+          ? await generateVoiceoverFromRenderer([script.hook, ...script.socialProof, script.cta].join(" "), script.language).catch(() => generateVoiceover([script.hook, ...script.socialProof, script.cta].join(" "), { language: script.language }))
+          : await generateVoiceover([script.hook, ...script.socialProof, script.cta].join(" "), { language: script.language })
+        : await generateVoiceover([script.hook, ...script.socialProof, script.cta].join(" "), { language: script.language });
       const audioUrl = voiceover.audioUrl;
       job = updateVideoJob(job.id, { output: { audioUrl, voiceProvider: voiceover.provider } });
       markJobStep(job.id, "voice", audioUrl ? "done" : "skipped");

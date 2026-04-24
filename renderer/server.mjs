@@ -1,6 +1,6 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,6 +29,17 @@ createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "POST" && request.url === "/tts") {
+      if (rendererToken && request.headers.authorization !== `Bearer ${rendererToken}`) {
+        sendJson(response, 401, { error: "Unauthorized." });
+        return;
+      }
+      const input = await readJsonBody(request);
+      const result = await generateTts(input, publicBaseUrl(request));
+      sendJson(response, 200, result);
+      return;
+    }
+
     if (request.method !== "POST" || request.url !== "/render") {
       sendJson(response, 404, { error: "Not found." });
       return;
@@ -51,6 +62,60 @@ createServer(async (request, response) => {
   console.log(`ReviewReel renderer listening on http://localhost:${port}`);
 });
 
+async function generateTts(input, baseUrl) {
+  const script = String(input.script || "").trim();
+  if (!script) {
+    throw new Error("TTS requires a non-empty 'script' field.");
+  }
+
+  const language = input.language || (hasCjk(script) ? "zh" : "en");
+  const voice = input.voice || (language === "zh" ? "zh-CN-XiaoxiaoNeural" : "en-US-JennyNeural");
+  const rate = input.rate || (language === "zh" ? "+0%" : "+0%");
+  const targetSeconds = Number(input.targetDurationSeconds || 15);
+
+  const id = `${Date.now()}-${randomUUID()}`;
+  const workDir = path.join("/tmp", `reviewreel-tts-${id}`);
+  await mkdir(workDir, { recursive: true });
+
+  try {
+    const rawAudio = path.join(workDir, "raw.mp3");
+    const compressedScript = compressForTts(script, language, targetSeconds);
+
+    await execFileAsync("edge-tts", [
+      "--voice", voice,
+      "--rate", rate,
+      "--text", compressedScript,
+      "--write-media", rawAudio,
+    ]);
+
+    const outputName = `voice-${id}.mp3`;
+    const outputPath = path.join(mediaRoot, outputName);
+
+    const duration = await getAudioDuration(rawAudio);
+
+    if (duration > targetSeconds + 2) {
+      await execFileAsync(ffmpegBin, [
+        "-y", "-i", rawAudio,
+        "-t", String(targetSeconds),
+        "-q:a", "4",
+        "-acodec", "libmp3lame",
+        outputPath,
+      ]);
+    } else {
+      const { rename } = await import("node:fs/promises");
+      await rename(rawAudio, outputPath);
+    }
+
+    return {
+      audioUrl: `${baseUrl}/media/${outputName}`,
+      provider: `edge-tts:${voice}`,
+      durationSeconds: Math.min(duration, targetSeconds),
+    };
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+}
+
 async function renderVideo(input, baseUrl) {
   const id = `${Date.now()}-${randomUUID()}`;
   const workDir = path.join("/tmp", `reviewreel-render-${id}`);
@@ -65,6 +130,20 @@ async function renderVideo(input, baseUrl) {
     const colors = templateColors(input.templateId);
     const imagePaths = await downloadImages(input.imageUrls ?? [], workDir);
     const segmentPaths = [];
+
+    let audioPath = "";
+    let voiceProvider = "";
+
+    if (input.audioUrl && /^https?:\/\//.test(input.audioUrl)) {
+      audioPath = await downloadAsset(input.audioUrl, workDir, "audio");
+    } else if (input.script) {
+      const ttsResult = await generateTts({
+        script: [input.script.hook, ...(input.script.socialProof || []), input.script.cta].filter(Boolean).join(" "),
+        language: hasCjk([input.script.hook, ...(input.script.socialProof || []), input.script.cta].join("")) ? "zh" : "en",
+      }, baseUrl);
+      audioPath = await downloadAsset(ttsResult.audioUrl, workDir, "tts-audio");
+      voiceProvider = ttsResult.provider;
+    }
 
     for (let index = 0; index < 3; index += 1) {
       const segmentPath = path.join(workDir, `segment-${index}.mp4`);
@@ -100,7 +179,6 @@ async function renderVideo(input, baseUrl) {
 
     const outputName = `reviewreel-${id}.mp4`;
     const outputPath = path.join(mediaRoot, outputName);
-    const audioPath = input.audioUrl ? await downloadAsset(input.audioUrl, workDir, "audio") : "";
 
     if (audioPath) {
       await execFileAsync(ffmpegBin, [
@@ -131,7 +209,7 @@ async function renderVideo(input, baseUrl) {
     return {
       videoUrl: `${baseUrl}/media/${outputName}`,
       images: [],
-      provider: "reviewreel-renderer:ffmpeg",
+      provider: `reviewreel-renderer:ffmpeg${voiceProvider ? `+${voiceProvider}` : ""}`,
     };
   } finally {
     await rm(workDir, { recursive: true, force: true });
@@ -255,6 +333,28 @@ async function downloadAsset(url, workDir, name) {
   return filePath;
 }
 
+async function getAudioDuration(filePath) {
+  try {
+    const { stdout } = await execFileAsync("ffprobe", [
+      "-v", "quiet",
+      "-print_format", "json",
+      "-show_format",
+      filePath,
+    ]);
+    const info = JSON.parse(stdout);
+    return Number(info?.format?.duration || 15);
+  } catch {
+    return 15;
+  }
+}
+
+function compressForTts(script, language, targetSeconds) {
+  const normalized = script.replace(/\s+/g, " ").trim();
+  const limit = language === "zh" ? Math.floor(targetSeconds * 6) : Math.floor(targetSeconds * 15);
+  if (normalized.length <= limit) return normalized;
+  return `${normalized.slice(0, limit).replace(/[，。,.!！?？、：:；;]\s*$/, "")}。`;
+}
+
 function normalizeSubtitles(input) {
   const fromInput = Array.isArray(input.subtitles) ? input.subtitles.filter(Boolean) : [];
   const script = input.script ?? {};
@@ -269,12 +369,12 @@ function normalizeSubtitles(input) {
     values.push(values[values.length - 1] || input.businessName || "ReviewReel");
   }
 
-  return values.slice(0, 3).map((value) => wrapText(String(value), /[\u3400-\u9fff]/.test(String(value)) ? 11 : 24));
+  return values.slice(0, 3).map((value) => wrapText(String(value), /[㐀-鿿]/.test(String(value)) ? 11 : 24));
 }
 
 function wrapText(value, maxChars) {
   const normalized = value.replace(/\s+/g, " ").trim();
-  const hasCjk = /[\u3400-\u9fff]/.test(normalized);
+  const hasCjk = /[㐀-鿿]/.test(normalized);
   if (!hasCjk) {
     const words = normalized.split(" ");
     const lines = [];
@@ -371,7 +471,7 @@ async function sendMedia(url, response) {
   }
 
   response.writeHead(200, {
-    "content-type": fileName.endsWith(".mp4") ? "video/mp4" : "application/octet-stream",
+    "content-type": fileName.endsWith(".mp4") ? "video/mp4" : fileName.endsWith(".mp3") ? "audio/mpeg" : "application/octet-stream",
     "cache-control": "public, max-age=31536000, immutable",
   });
   createReadStream(filePath).pipe(response);
@@ -380,4 +480,8 @@ async function sendMedia(url, response) {
 function sendJson(response, status, value) {
   response.writeHead(status, { "content-type": "application/json" });
   response.end(JSON.stringify(value));
+}
+
+function hasCjk(text) {
+  return /[㐀-鿿]/.test(text);
 }

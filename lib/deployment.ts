@@ -27,8 +27,6 @@ export function getMediaRuntimeUnsupportedMessage(
   if (
     options.allowRemotePipeline &&
     process.env.BLOB_READ_WRITE_TOKEN &&
-    process.env.TTS_ENDPOINT_URL &&
-    process.env.TTS_API_KEY &&
     process.env.VIDEO_RENDERER_URL &&
     process.env.VIDEO_RENDERER_TOKEN
   ) {

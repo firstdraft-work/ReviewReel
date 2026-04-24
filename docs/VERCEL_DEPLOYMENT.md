@@ -190,24 +190,24 @@ flowchart TD
 ## 6. Vercel 环境变量
 
 必需：
-- `BLOB_READ_WRITE_TOKEN`
-- `VIDEO_RENDERER_URL`
-- `VIDEO_RENDERER_TOKEN`
-- `TTS_PROVIDER=cloud`
-- `TTS_API_KEY`
+- `BLOB_READ_WRITE_TOKEN`（Vercel Blob Store 创建后自动注入）
+- `VIDEO_RENDERER_URL`（renderer 服务地址，如 `https://reviewreel-renderer.up.railway.app`）
+- `VIDEO_RENDERER_TOKEN`（renderer 认证 token）
+
+TTS 不再需要单独配置：renderer 内置了 Edge TTS（免费），会自动处理语音生成。
 
 本地可选：
-- `TTS_PROVIDER=system`
+- `TTS_PROVIDER=system`（macOS `say`）
 - `FFMPEG_PATH=ffmpeg`
 
 ## 7. 部署前检查清单
 
-- [ ] `npm run lint`
-- [ ] `npm run typecheck`
-- [ ] `npm run build`
-- [ ] `public/generated` 没有被纳入 git
-- [ ] Vercel 项目已配置 Blob
-- [ ] Vercel 环境变量已配置
-- [ ] 生产环境不调用 `qlmanage`
-- [ ] 生产环境不调用 macOS `say`
-- [ ] 生产视频输出为 Blob URL 或外部对象存储 URL
+- [x] `npm run lint`
+- [x] `npm run typecheck`
+- [x] `npm run build`
+- [x] `public/generated` 没有被纳入 git
+- [x] Vercel 项目已配置 Blob
+- [ ] Vercel 环境变量已配置（VIDEO_RENDERER_URL + VIDEO_RENDERER_TOKEN）
+- [x] 生产环境不调用 `qlmanage`
+- [x] 生产环境不调用 macOS `say`
+- [ ] 生产视频输出为 renderer 返回的 media URL
