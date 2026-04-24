@@ -383,6 +383,13 @@ ReviewReel 目前已经是一个可运行的 Next.js MVP。用户可以在 `/gen
 验收：
 - job 返回 `metrics.totalMs` 和每一步耗时。
 
+状态：已完成。
+
+完成记录：
+- `lib/jobs.ts` `markJobStep` 计算每个步骤 `durationMs`
+- `app/api/generate/route.ts` 记录 `metrics.totalMs`
+- `app/generate/generate-client.tsx` 展示每个步骤耗时和总耗时
+
 ## Phase 6：部署准备（部分完成）
 
 目标：为部署到 Vercel 扫清障碍，同时把不适合 Vercel Functions 的媒体处理拆出来。
