@@ -15,7 +15,7 @@
 | Phase 2：中文与本地商家内容质量 | 已完成 | 中文脚本字段、行业识别、餐饮中文 hook/CTA、关键词提取 | 中文 `/api/generate` 通过；“拉州拉面馆”识别为 `food`；`ffprobe 1080x1920/15s` | 扩展更多行业模板和文案多样性 |
 | Phase 3：图片上传与视觉模板 | 已完成 | 上传 API、上传 UI、缩略图/删除、上传图片作为视频场景背景、3 个模板和模板选择 | 上传 API smoke 通过；带上传图 `/api/generate` 通过；`warm-local` 模板生成通过；`ffprobe 1080x1920/15s`；浏览器上传/模板 UI 无错误 | 后续继续扩展更多模板 |
 | Phase 4：中文 TTS 与音频体验 | 已完成 | TTS provider 抽象、本机 macOS `say` 中文语音、静音 fallback、前端展示语音 provider | 中文“拉州拉面馆”生成通过；`voiceProvider=system:Tingting`；`ffprobe 1080x1920/15s`；`npm run lint`、`npm run typecheck`、`npm run build` | 后续可接入云端 TTS provider |
-| Phase 5：质量、测试与可观测性 | 部分完成 | `scripts/smoke.mjs` 已更新为 Job API 集成验证；Job metrics 已有总耗时和阶段耗时 | `node ./scripts/smoke.mjs` 通过 | 增加单元测试和更完整指标 |
+| Phase 5：质量、测试与可观测性 | 部分完成 | `scripts/smoke.mjs` 已更新为 Job API 集成验证；Job metrics 已有总耗时和阶段耗时；单元测试 40 个通过覆盖 ai/jobs/templates | `node ./scripts/smoke.mjs` 通过；`npm run test` 40 pass | 增加更完整指标 |
 | Phase 6：部署准备 | 部分完成 | Vercel 部署计划、`vercel.json`、`.env.example`、`.gitignore`、生产媒体护栏、storage provider、Blob 上传分支、远程 TTS adapter、远程 video renderer adapter | `npm run lint`、`npm run typecheck`、`npm run build`、`node ./scripts/smoke.mjs`、`/api/uploads` smoke | 选择实际 renderer 服务，完成线上端到端部署验证 |
 
 ## 1. 当前基线
@@ -349,6 +349,16 @@ ReviewReel 目前已经是一个可运行的 Next.js MVP。用户可以在 `/gen
 验收：
 - 核心纯函数有测试覆盖。
 
+状态：已完成。
+
+完成记录：
+- 新增 `vitest.config.ts`，配置路径别名和测试目录
+- `package.json` 增加 `test` 和 `test:watch` 脚本
+- `lib/ai.test.ts`：18 个测试覆盖 normalizeReviews、英文/中文脚本生成、6 种行业识别、关键词提取、CTA 生成
+- `lib/jobs.test.ts`：14 个测试覆盖 createVideoJob、getVideoJob、updateVideoJob、markJobStep 状态流转、listVideoJobs
+- `lib/templates.test.ts`：8 个测试覆盖 getVideoTemplate、默认模板、模板结构完整性
+- `npm run test` 全部 40 pass
+
 ### 5.2 API 集成测试
 
 文件：
@@ -605,3 +615,13 @@ ReviewReel 目前已经是一个可运行的 Next.js MVP。用户可以在 `/gen
   - `npm run lint`、`npm run typecheck`、`npm run build` 均通过
 
 下一步：进入 Phase 5.1，补核心纯函数和 Job Store 的单元测试。
+
+- [x] Phase 5.1 单元测试
+  - 新增 `vitest.config.ts`，配置 `@` 路径别名和 `lib/*.test.ts` 测试目录
+  - `package.json` 增加 `npm run test` 和 `npm run test:watch` 脚本
+  - `lib/ai.test.ts`：18 个测试覆盖 normalizeReviews、英文/中文脚本生成、6 种行业识别（food/beauty/repair/fitness/education/general）、关键词提取、CTA 生成
+  - `lib/jobs.test.ts`：14 个测试覆盖 createVideoJob、getVideoJob、updateVideoJob（top-level/output/metrics/steps 合并）、markJobStep（processing/done/failed/skipped 状态流转和 durationMs 计算）、listVideoJobs
+  - `lib/templates.test.ts`：8 个测试覆盖 getVideoTemplate 有效/无效 ID、默认模板、模板结构完整性（3 色彩/3 标签/透明度范围）
+  - `npm run test` 全部 40 pass
+
+下一步：进入 Phase 5.3 运行指标增强，或进入 Phase 6 完成部署准备。
