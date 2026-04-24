@@ -4,7 +4,7 @@ import { createSceneImages } from "@/lib/ffmpeg";
 import { mediaRuntimeUnsupportedResponse } from "@/lib/deployment";
 import { createVideoJob, markJobStep, updateVideoJob } from "@/lib/jobs";
 import { defaultTemplateId, getVideoTemplate } from "@/lib/templates";
-import { generateVoiceover, generateVoiceoverFromRenderer, isRendererTtsAvailable } from "@/lib/tts";
+import { generateVoiceover } from "@/lib/tts";
 import { isRemoteVideoRendererConfigured, renderVideo } from "@/lib/video-renderer";
 import type { GeneratePipelineInput } from "@/types/video";
 
@@ -43,6 +43,8 @@ export async function POST(request: Request) {
     let currentStep: "script" | "images" | "voice" | "video" | null = null;
 
     try {
+      const useRemoteRenderer = isRemoteVideoRendererConfigured();
+
       currentStep = "script";
       markJobStep(job.id, "script", "processing");
       const script = generateScript(input);
@@ -51,21 +53,27 @@ export async function POST(request: Request) {
 
       currentStep = "images";
       markJobStep(job.id, "images", "processing");
-      const useRemoteRenderer = isRemoteVideoRendererConfigured();
       const images = useRemoteRenderer ? input.imageUrls : await createSceneImages(script, input.imageUrls, input.templateId);
       job = updateVideoJob(job.id, { output: { images } });
       markJobStep(job.id, "images", useRemoteRenderer ? "skipped" : "done");
 
       currentStep = "voice";
       markJobStep(job.id, "voice", "processing");
-      const voiceover = isRemoteVideoRendererConfigured()
-        ? isRendererTtsAvailable()
-          ? await generateVoiceoverFromRenderer([script.hook, ...script.socialProof, script.cta].join(" "), script.language).catch(() => generateVoiceover([script.hook, ...script.socialProof, script.cta].join(" "), { language: script.language }))
-          : await generateVoiceover([script.hook, ...script.socialProof, script.cta].join(" "), { language: script.language })
-        : await generateVoiceover([script.hook, ...script.socialProof, script.cta].join(" "), { language: script.language });
-      const audioUrl = voiceover.audioUrl;
-      job = updateVideoJob(job.id, { output: { audioUrl, voiceProvider: voiceover.provider } });
-      markJobStep(job.id, "voice", audioUrl ? "done" : "skipped");
+      let audioUrl = "";
+      let voiceProvider = "";
+
+      if (useRemoteRenderer) {
+        // Renderer handles TTS internally via Edge TTS during /render
+        markJobStep(job.id, "voice", "skipped");
+      } else {
+        const voiceover = await generateVoiceover([script.hook, ...script.socialProof, script.cta].join(" "), {
+          language: script.language,
+        });
+        audioUrl = voiceover.audioUrl;
+        voiceProvider = voiceover.provider;
+        job = updateVideoJob(job.id, { output: { audioUrl, voiceProvider } });
+        markJobStep(job.id, "voice", audioUrl ? "done" : "skipped");
+      }
 
       currentStep = "video";
       markJobStep(job.id, "video", "processing");
@@ -83,6 +91,11 @@ export async function POST(request: Request) {
       if (renderedVideo.images) {
         job = updateVideoJob(job.id, { output: { images: renderedVideo.images } });
       }
+      job = updateVideoJob(job.id, {
+        output: {
+          voiceProvider: voiceProvider || renderedVideo.provider,
+        },
+      });
       markJobStep(job.id, "video", "done");
       currentStep = null;
 
