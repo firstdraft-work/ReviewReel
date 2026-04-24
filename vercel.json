@@ -1,0 +1,16 @@
+{
+  "functions": {
+    "app/api/generate/route.ts": {
+      "maxDuration": 300,
+      "memory": 1024
+    },
+    "app/api/generate-video/route.ts": {
+      "maxDuration": 300,
+      "memory": 1024
+    },
+    "app/api/uploads/route.ts": {
+      "maxDuration": 60,
+      "memory": 512
+    }
+  }
+}
