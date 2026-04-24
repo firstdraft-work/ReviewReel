@@ -632,3 +632,17 @@ ReviewReel 目前已经是一个可运行的 Next.js MVP。用户可以在 `/gen
   - `npm run test` 全部 40 pass
 
 下一步：进入 Phase 5.3 运行指标增强，或进入 Phase 6 完成部署准备。
+
+- [x] Phase 5.3 运行指标
+  - `lib/jobs.ts` `markJobStep` 计算每个步骤 `durationMs`
+  - `app/api/generate/route.ts` 记录 `metrics.totalMs`
+  - `app/generate/generate-client.tsx` 展示每个步骤耗时和总耗时
+
+- [x] Phase 6.1 Vercel 部署验证
+  - Vercel 项目 `reviewreel` 已创建并成功部署
+  - 前端 `/generate` 正常渲染（HTTP 200）
+  - `/api/generate` 在未配置远程服务时正确返回 501 `MEDIA_RUNTIME_NOT_CONFIGURED`
+  - 移除 `vercel.json` 中被忽略的 `memory` 配置
+  - 生产 URL: https://reviewreel-tau.vercel.app
+
+下一步：配置 Vercel 环境变量（Blob + 云 TTS + 远程 renderer）以打通完整生产链路。
