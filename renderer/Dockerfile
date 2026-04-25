@@ -18,7 +18,7 @@ COPY server.mjs ./
 
 ENV PORT=8080
 ENV FFMPEG_PATH=ffmpeg
-ENV FONT_NAME=Noto Sans CJK SC
+ENV FONT_NAME="Noto Sans CJK SC"
 
 EXPOSE 8080
 CMD ["node", "server.mjs"]
