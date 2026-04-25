@@ -70,7 +70,8 @@ async function renderRemoteVideo(input: RenderVideoInput): Promise<RenderVideoRe
   });
 
   if (!response.ok) {
-    throw new Error(`Remote video renderer failed with status ${response.status}.`);
+    const body = await response.text().catch(() => "");
+    throw new Error(`Remote video renderer failed (${response.status}): ${body.slice(0, 200)}`);
   }
 
   const result = (await response.json()) as RemoteRendererResponse;

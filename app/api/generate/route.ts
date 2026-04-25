@@ -108,14 +108,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ job });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Generation failed.";
-      if (currentStep) {
-        markJobStep(job.id, currentStep, "failed", message);
+      try {
+        if (currentStep) {
+          markJobStep(job.id, currentStep, "failed", message);
+        }
+        job = updateVideoJob(job.id, {
+          status: "failed",
+          error: message,
+          metrics: { totalMs: Date.now() - startedAt },
+        });
+      } catch {
+        // Job update failed, return the error message anyway
       }
-      job = updateVideoJob(job.id, {
-        status: "failed",
-        error: message,
-        metrics: { totalMs: Date.now() - startedAt },
-      });
 
       return NextResponse.json({ job, error: message }, { status: 500 });
     }

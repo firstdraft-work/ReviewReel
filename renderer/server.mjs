@@ -293,9 +293,13 @@ async function downloadAsset(url, workDir, name) {
     return "";
   }
 
+  if (!isSafeFetchUrl(url)) {
+    throw new Error("Asset URL points to a restricted host.");
+  }
+
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`Failed to download asset ${url}: ${response.status}`);
+    throw new Error(`Failed to download asset: ${response.status}`);
   }
 
   const contentType = response.headers.get("content-type") || "";
@@ -418,27 +422,34 @@ function publicBaseUrl(request) {
 
 async function readJsonBody(request) {
   const chunks = [];
+  let totalSize = 0;
   for await (const chunk of request) {
+    totalSize += chunk.length;
+    if (totalSize > 2 * 1024 * 1024) {
+      throw new Error("Request body is too large.");
+    }
     chunks.push(chunk);
   }
 
-  if (Buffer.concat(chunks).length > 2 * 1024 * 1024) {
-    throw new Error("Request body is too large.");
-  }
-
-  return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+  const body = Buffer.concat(chunks);
+  return JSON.parse(body.toString("utf8") || "{}");
 }
 
 async function sendMedia(url, response) {
   const fileName = decodeURIComponent(url.replace(/^\/media\//, ""));
-  if (!/^[a-zA-Z0-9._-]+$/.test(fileName)) {
+  if (fileName.includes("..") || !/^[a-zA-Z0-9._-]+$/.test(fileName)) {
     sendJson(response, 400, { error: "Invalid media path." });
     return;
   }
 
-  const filePath = path.join(mediaRoot, fileName);
-  const bytes = await readFile(filePath).catch(() => null);
-  if (!bytes) {
+  const filePath = path.resolve(mediaRoot, fileName);
+  if (!filePath.startsWith(path.resolve(mediaRoot) + path.sep)) {
+    sendJson(response, 403, { error: "Forbidden." });
+    return;
+  }
+
+  const info = await stat(filePath).catch(() => null);
+  if (!info) {
     sendJson(response, 404, { error: "Media not found." });
     return;
   }
@@ -446,15 +457,34 @@ async function sendMedia(url, response) {
   response.writeHead(200, {
     "content-type": fileName.endsWith(".mp4") ? "video/mp4" : fileName.endsWith(".mp3") ? "audio/mpeg" : "application/octet-stream",
     "cache-control": "public, max-age=31536000, immutable",
+    "content-length": info.size,
+    "x-content-type-options": "nosniff",
   });
-  createReadStream(filePath).pipe(response);
+  createReadStream(filePath).on("error", () => {
+    if (!response.headersSent) sendJson(response, 500, { error: "Stream failed." });
+    else response.end();
+  }).pipe(response);
 }
 
 function sendJson(response, status, value) {
-  response.writeHead(status, { "content-type": "application/json" });
+  response.writeHead(status, { "content-type": "application/json", "x-content-type-options": "nosniff" });
   response.end(JSON.stringify(value));
 }
 
 function hasCjk(text) {
   return /[㐀-鿿]/.test(text);
+}
+
+function isSafeFetchUrl(urlString) {
+  try {
+    const parsed = new URL(urlString);
+    if (!["http:", "https:"].includes(parsed.protocol)) return false;
+    const host = parsed.hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1" || host === "::1") return false;
+    if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|0\.)/.test(host)) return false;
+    if (host.endsWith(".internal") || host.endsWith(".local")) return false;
+    return true;
+  } catch {
+    return false;
+  }
 }

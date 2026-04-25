@@ -68,7 +68,8 @@ export async function generateVoiceoverFromRenderer(
   });
 
   if (!response.ok) {
-    throw new Error(`Renderer TTS failed with status ${response.status}.`);
+    const body = await response.text().catch(() => "");
+    throw new Error(`Renderer TTS failed (${response.status}): ${body.slice(0, 200)}`);
   }
 
   const result = (await response.json()) as RemoteVoiceoverResponse;
@@ -107,7 +108,8 @@ async function createRemoteVoiceover(script: string, language: ReviewScript["lan
   });
 
   if (!response.ok) {
-    throw new Error(`Cloud TTS failed with status ${response.status}.`);
+    const body = await response.text().catch(() => "");
+    throw new Error(`Cloud TTS failed (${response.status}): ${body.slice(0, 200)}`);
   }
 
   const result = (await response.json()) as RemoteVoiceoverResponse;
@@ -198,5 +200,5 @@ function compressForVoiceover(script: string, language: ReviewScript["language"]
     return normalized;
   }
 
-  return `${normalized.slice(0, limit).replace(/[，。,.!！?？、：:；;]\s*$/, "")}。`;
+  return `${normalized.slice(0, limit).replace(/[，。,.!！?？、：:；;]\s*$/, "")}${language === "zh" ? "。" : "."}`;
 }

@@ -139,6 +139,7 @@ export function GenerateClient() {
   }
 
   const isGenerating = activeStep !== null;
+  const canGenerate = !isGenerating && !isUploading && businessName.trim().length > 0 && reviews.length > 0;
 
   function applyJob(nextJob: VideoJob) {
     setJob(nextJob);
@@ -185,7 +186,13 @@ export function GenerateClient() {
         method: "POST",
         body: formData,
       });
-      const json = (await response.json()) as { images?: string[]; error?: string };
+
+      let json: { images?: string[]; error?: string };
+      try {
+        json = (await response.json()) as { images?: string[]; error?: string };
+      } catch {
+        throw new Error(`Upload failed with status ${response.status}.`);
+      }
 
       if (!response.ok) {
         throw new Error(json.error ?? "Image upload failed.");
@@ -236,17 +243,19 @@ export function GenerateClient() {
           <div className="grid gap-3">
             <div className="grid gap-2">
               <span className="text-sm font-bold">Template</span>
-              <div className="grid gap-2">
+              <div className="grid gap-2" role="radiogroup" aria-label="Video template">
                 {templateOptions.map((template) => {
                   const selected = template.id === templateId;
 
                   return (
                     <button
+                      aria-checked={selected}
                       className={`border px-3 py-2 text-left transition ${
                         selected ? "border-black bg-black text-white" : "border-line bg-background text-foreground hover:border-black"
                       }`}
                       key={template.id}
                       onClick={() => setTemplateId(template.id)}
+                      role="radio"
                       type="button"
                     >
                       <span className="block text-sm font-black">{template.name}</span>
@@ -263,6 +272,7 @@ export function GenerateClient() {
               <span className="text-sm font-bold">Store images</span>
               <input
                 accept="image/jpeg,image/png,image/webp"
+                aria-describedby="image-help"
                 className="border-line bg-background border p-3 text-sm"
                 disabled={isUploading || uploadedImages.length >= 5}
                 multiple
@@ -273,7 +283,7 @@ export function GenerateClient() {
                 type="file"
               />
             </label>
-            <p className="text-muted text-xs font-semibold">
+            <p className="text-muted text-xs font-semibold" id="image-help">
               Optional. Upload up to 5 JPG, PNG, or WEBP images. The first 3 are used as video backgrounds.
             </p>
             {uploadedImages.length > 0 ? (
@@ -295,18 +305,18 @@ export function GenerateClient() {
           </div>
 
           {error ? (
-            <div className="border border-red-700 bg-red-50 p-3 text-sm font-semibold text-red-800">{error}</div>
+            <div className="border border-red-700 bg-red-50 p-3 text-sm font-semibold text-red-800" role="alert">{error}</div>
           ) : null}
 
           <button
             className="bg-ink h-13 text-base font-black text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-55"
-            disabled={isGenerating || isUploading}
+            disabled={!canGenerate}
             onClick={() => {
               void generate();
             }}
             type="button"
           >
-            {isUploading ? "Uploading..." : isGenerating ? "Generating..." : "Generate"}
+            {isUploading ? "Uploading..." : isGenerating ? <span className="animate-pulse">Generating...</span> : "Generate"}
           </button>
         </section>
 
@@ -322,6 +332,9 @@ export function GenerateClient() {
                     <p className="mt-4 text-lg font-black">{step.label}</p>
                     {job?.steps[step.key].durationMs ? (
                       <p className="text-muted mt-2 text-xs font-bold">{job.steps[step.key].durationMs}ms</p>
+                    ) : null}
+                    {job?.steps[step.key].status === "failed" && job.steps[step.key].error ? (
+                      <p className="mt-1 text-xs font-semibold text-red-700">{job.steps[step.key].error}</p>
                     ) : null}
                   </div>
                 );
@@ -374,7 +387,13 @@ export function GenerateClient() {
               <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(220px,320px)_1fr]">
                 <div className="bg-ink aspect-[9/16] overflow-hidden">
                   {videoUrl ? (
-                    <video className="h-full w-full object-cover" controls playsInline src={videoUrl} />
+                    <video
+                      aria-label={`Generated marketing video for ${businessName}`}
+                      className="h-full w-full object-cover"
+                      controls
+                      playsInline
+                      src={videoUrl}
+                    />
                   ) : (
                     <div className="flex h-full items-center justify-center p-6 text-center text-sm font-bold text-white/70">
                       9:16 video preview
@@ -399,8 +418,8 @@ export function GenerateClient() {
                   )}
                   {audioUrl ? (
                     <div className="text-muted grid gap-1 text-sm">
-                      <p>Voiceover provider: {job?.output.voiceProvider || "fallback"}</p>
-                      <p>Voiceover asset: {audioUrl}</p>
+                      <p>Voiceover: {job?.output.voiceProvider || "fallback"}</p>
+                      <a className="underline" href={audioUrl} rel="noreferrer" target="_blank">Download voiceover</a>
                     </div>
                   ) : null}
                 </div>
@@ -439,7 +458,12 @@ async function postJson<T>(url: string, payload: unknown): Promise<T> {
     body: JSON.stringify(payload),
   });
 
-  const json = (await response.json()) as T & { error?: string; job?: VideoJob };
+  let json: T & { error?: string; job?: VideoJob };
+  try {
+    json = (await response.json()) as T & { error?: string; job?: VideoJob };
+  } catch {
+    throw new ApiError(`Request failed with status ${response.status}.`);
+  }
 
   if (!response.ok) {
     throw new ApiError(json.error ?? `Request failed: ${url}`, json.job);
