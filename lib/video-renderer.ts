@@ -44,7 +44,9 @@ export async function renderVideo(input: RenderVideoInput): Promise<RenderVideoR
 }
 
 async function renderRemoteVideo(input: RenderVideoInput): Promise<RenderVideoResult> {
-  const response = await fetch(process.env.VIDEO_RENDERER_URL!, {
+  const baseUrl = process.env.VIDEO_RENDERER_URL!.replace(/\/+$/, "");
+  const renderUrl = baseUrl.endsWith("/render") ? baseUrl : `${baseUrl}/render`;
+  const response = await fetch(renderUrl, {
     method: "POST",
     headers: {
       "content-type": "application/json",
