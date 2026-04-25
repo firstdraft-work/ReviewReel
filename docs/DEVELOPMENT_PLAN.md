@@ -16,7 +16,7 @@
 | Phase 3：图片上传与视觉模板 | 已完成 | 上传 API、上传 UI、缩略图/删除、上传图片作为视频场景背景、3 个模板和模板选择 | 上传 API smoke 通过；带上传图 `/api/generate` 通过；`warm-local` 模板生成通过；`ffprobe 1080x1920/15s`；浏览器上传/模板 UI 无错误 | 后续继续扩展更多模板 |
 | Phase 4：中文 TTS 与音频体验 | 已完成 | TTS provider 抽象、本机 macOS `say` 中文语音、静音 fallback、前端展示语音 provider | 中文“拉州拉面馆”生成通过；`voiceProvider=system:Tingting`；`ffprobe 1080x1920/15s`；`npm run lint`、`npm run typecheck`、`npm run build` | 后续可接入云端 TTS provider |
 | Phase 5：质量、测试与可观测性 | 部分完成 | `scripts/smoke.mjs` 已更新为 Job API 集成验证；Job metrics 已有总耗时和阶段耗时；单元测试 40 个通过覆盖 ai/jobs/templates | `node ./scripts/smoke.mjs` 通过；`npm run test` 40 pass | 增加更完整指标 |
-| Phase 6：部署准备 | 部分完成 | Vercel 部署计划、`vercel.json`、`.env.example`、`.gitignore`、生产媒体护栏、storage provider、Blob 上传分支、远程 TTS adapter、远程 video renderer adapter | `npm run lint`、`npm run typecheck`、`npm run build`、`node ./scripts/smoke.mjs`、`/api/uploads` smoke | 选择实际 renderer 服务，完成线上端到端部署验证 |
+| Phase 6：部署准备 | 已完成 | Vercel 部署 + Blob 存储 + Railway renderer（Edge TTS + FFmpeg）+ 线上端到端生成通过 | Vercel 线上生成 15s MP4 成功 | 扩展模板、字幕支持、用户测试 |
 
 ## 1. 当前基线
 
@@ -646,3 +646,29 @@ ReviewReel 目前已经是一个可运行的 Next.js MVP。用户可以在 `/gen
   - 生产 URL: https://reviewreel-tau.vercel.app
 
 下一步：配置 Vercel 环境变量（Blob + 云 TTS + 远程 renderer）以打通完整生产链路。
+
+- [x] Phase 6.2 文件存储（Vercel Blob）
+  - `lib/storage.ts` 支持 `STORAGE_PROVIDER=blob` 写入 Vercel Blob
+  - 上传图片通过 Blob 存储，公开 URL 可访问
+  - `next.config.ts` 已配置 Blob 域名白名单支持 Next.js `<Image>`
+
+- [x] Phase 6.3 云端 TTS（Edge TTS）
+  - Renderer 内置 Edge TTS（免费，无需 API Key）
+  - `renderer/server.mjs` 新增 `/tts` 端点
+  - Dockerfile 安装 `python3` + `edge-tts`
+  - 中文语音：`zh-CN-XiaoxiaoNeural`，英文：`en-US-JennyNeural`
+
+- [x] Phase 6.4 远程视频渲染服务（Railway）
+  - Renderer 部署在 Railway: `https://reviewreel.up.railway.app`
+  - Dockerfile 包含 FFmpeg + Noto CJK 字体 + Edge TTS
+  - Vercel `/api/generate` 编排：script（本地）→ images/voice（跳过）→ video（远程 renderer）
+  - Renderer 自动处理 TTS + 场景生成 + FFmpeg 合成
+  - 使用 `ultrafast` preset + 24fps 降低内存占用
+  - Vercel 环境变量：`VIDEO_RENDERER_URL` + `VIDEO_RENDERER_TOKEN` + `BLOB_READ_WRITE_TOKEN`
+
+- [x] Phase 6 端到端验证
+  - Vercel 线上完整生成链路通过：输入商家名+评论 → 生成 15s 9:16 MP4
+  - 生产 URL: https://reviewreel-tau.vercel.app/generate
+  - Renderer URL: https://reviewreel.up.railway.app
+
+下一步：继续扩展模板、增加字幕支持、优化视频质量，或开始用户测试。
