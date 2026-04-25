@@ -218,11 +218,13 @@ async function renderVideo(input, baseUrl) {
 }
 
 async function renderSegment(options) {
-  const safeText = (options.subtitle || "").replace(/'/g, "'\\''").replace(/:/g, "\\:");
+  const bom = Buffer.from([0xef, 0xbb, 0xbf]);
+  const text = Buffer.from(options.subtitle || "", "utf8");
+  await writeFile(options.textFile, Buffer.concat([bom, text]));
 
   const drawText = [
     "drawbox=x=70:y=1320:w=940:h=360:color=black@0.52:t=fill",
-    `drawtext=${fontOption()}text='${safeText}':x=110:y=1385:fontsize=58:fontcolor=white:line_spacing=18:box=0`,
+    `drawtext=${fontOption()}textfile='${escapeFilterPath(options.textFile)}':x=110:y=1385:fontsize=58:fontcolor=white:line_spacing=18:box=0`,
   ].join(",");
 
   if (options.imagePath) {
