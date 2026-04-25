@@ -264,11 +264,11 @@ async function renderSegment(options) {
   );
 }
 
-async function execFfmpegWithTextFallback(args, outputPath, fallbackArgs) {
+async function execFfmpegWithTextFallback(args, fallbackArgs) {
   try {
     await execFileAsync(ffmpegBin, args, { maxBuffer: 1024 * 1024 * 10 });
   } catch {
-    console.warn(`drawtext failed; rendering ${path.basename(outputPath)} without subtitles.`);
+    console.warn("Subtitle render failed; retrying without subtitles.");
     await execFileAsync(ffmpegBin, fallbackArgs, { maxBuffer: 1024 * 1024 * 10 });
   }
 }
