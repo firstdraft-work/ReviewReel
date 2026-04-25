@@ -35,7 +35,7 @@ createServer(async (request, response) => {
     }
 
     if (request.method === "POST" && request.url === "/tts") {
-      if (!rendererToken || request.headers.authorization !== `Bearer ${rendererToken}`) {
+      if (rendererToken && request.headers.authorization !== `Bearer ${rendererToken}`) {
         sendJson(response, 401, { error: "Unauthorized." });
         return;
       }
@@ -50,7 +50,7 @@ createServer(async (request, response) => {
       return;
     }
 
-    if (!rendererToken || request.headers.authorization !== `Bearer ${rendererToken}`) {
+    if (rendererToken && request.headers.authorization !== `Bearer ${rendererToken}`) {
       sendJson(response, 401, { error: "Unauthorized." });
       return;
     }
