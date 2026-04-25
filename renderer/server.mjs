@@ -218,50 +218,50 @@ async function renderVideo(input, baseUrl) {
 }
 
 async function renderSegment(options) {
-  const bom = Buffer.from([0xef, 0xbb, 0xbf]);
-  const text = Buffer.from(options.subtitle || "", "utf8");
-  await writeFile(options.textFile, Buffer.concat([bom, text]));
+  const assPath = options.textFile.replace(/\.txt$/, ".ass");
+  const safeText = (options.subtitle || "").replace(/\n/g, "\\N");
+  const assContent = [
+    "[Script Info]",
+    "ScriptType: v4.00+",
+    `PlayResX: ${options.width}`,
+    `PlayResY: ${options.height}`,
+    "",
+    "[V4+ Styles]",
+    "Format: Name, Fontname, Fontsize, PrimaryColour, BackColour, Bold, Italic, Alignment, MarginL, MarginR, MarginV",
+    `Style: Default,Noto Sans SC,58,&H00FFFFFF,&H00000000,-1,0,2,110,110,30`,
+    "",
+    "[Events]",
+    "Format: Layer, Start, End, Style, Name, Text",
+    `Dialogue: 0,0:00:00.00,0:00:0${options.seconds}.00,Default,,${safeText}`,
+  ].join("\n");
+  await writeFile(assPath, assContent, "utf8");
 
-  const drawText = [
-    "drawbox=x=70:y=1320:w=940:h=360:color=black@0.52:t=fill",
-    `drawtext=${fontOption()}textfile='${escapeFilterPath(options.textFile)}':x=110:y=1385:fontsize=58:fontcolor=white:line_spacing=18:box=0`,
-  ].join(",");
+  const drawBox = "drawbox=x=70:y=1320:w=940:h=360:color=black@0.52:t=fill";
+  const subFilter = `subtitles='${escapeFilterPath(assPath)}'`;
+  const vfWithSub = `${drawBox},${subFilter}`;
+  const vfCropOnly = `scale=${options.width}:${options.height}:force_original_aspect_ratio=increase,crop=${options.width}:${options.height}`;
 
   if (options.imagePath) {
-    const args = [
-      "-y", "-loglevel", "error",
-      "-loop", "1", "-t", String(options.seconds),
-      "-i", options.imagePath,
-      "-vf", `scale=${options.width}:${options.height}:force_original_aspect_ratio=increase,crop=${options.width}:${options.height},${drawText}`,
-      "-r", "24", "-c:v", "libx264", "-preset", "ultrafast",
-      "-pix_fmt", "yuv420p", options.outputPath,
-    ];
-    await execFfmpegWithTextFallback(args, options.outputPath, [
-      "-y", "-loglevel", "error",
-      "-loop", "1", "-t", String(options.seconds),
-      "-i", options.imagePath,
-      "-vf", `scale=${options.width}:${options.height}:force_original_aspect_ratio=increase,crop=${options.width}:${options.height}`,
-      "-r", "24", "-c:v", "libx264", "-preset", "ultrafast",
-      "-pix_fmt", "yuv420p", options.outputPath,
-    ]);
+    await execFfmpegWithTextFallback(
+      ["-y", "-loglevel", "error", "-loop", "1", "-t", String(options.seconds),
+        "-i", options.imagePath, "-vf", `${vfCropOnly},${vfWithSub}`,
+        "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", options.outputPath],
+      ["-y", "-loglevel", "error", "-loop", "1", "-t", String(options.seconds),
+        "-i", options.imagePath, "-vf", vfCropOnly,
+        "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", options.outputPath],
+    );
     return;
   }
 
-  const args = [
-    "-y", "-loglevel", "error",
-    "-f", "lavfi",
-    "-i", `color=c=${options.color}:s=${options.width}x${options.height}:d=${options.seconds}:r=24`,
-    "-vf", drawText,
-    "-c:v", "libx264", "-preset", "ultrafast",
-    "-pix_fmt", "yuv420p", options.outputPath,
-  ];
-  await execFfmpegWithTextFallback(args, options.outputPath, [
-    "-y", "-loglevel", "error",
-    "-f", "lavfi",
-    "-i", `color=c=${options.color}:s=${options.width}x${options.height}:d=${options.seconds}:r=24`,
-    "-c:v", "libx264", "-preset", "ultrafast",
-    "-pix_fmt", "yuv420p", options.outputPath,
-  ]);
+  await execFfmpegWithTextFallback(
+    ["-y", "-loglevel", "error", "-f", "lavfi",
+      "-i", `color=c=${options.color}:s=${options.width}x${options.height}:d=${options.seconds}:r=24`,
+      "-vf", vfWithSub,
+      "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", options.outputPath],
+    ["-y", "-loglevel", "error", "-f", "lavfi",
+      "-i", `color=c=${options.color}:s=${options.width}x${options.height}:d=${options.seconds}:r=24`,
+      "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", options.outputPath],
+  );
 }
 
 async function execFfmpegWithTextFallback(args, outputPath, fallbackArgs) {
