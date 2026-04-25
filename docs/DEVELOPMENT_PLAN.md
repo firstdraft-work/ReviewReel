@@ -672,3 +672,17 @@ ReviewReel 目前已经是一个可运行的 Next.js MVP。用户可以在 `/gen
   - Renderer URL: https://reviewreel.up.railway.app
 
 下一步：继续扩展模板、增加字幕支持、优化视频质量，或开始用户测试。
+
+- [x] ASS 字幕支持（替代 drawtext）
+  - Renderer 从 FFmpeg `drawtext` 切换到 ASS (Advanced SubStation Alpha) 字幕
+  - ASS 使用 libass 渲染 CJK 字符，解决中文乱码问题
+  - 字幕样式：白色文字 + 半透明黑色描边 + 阴影，自然融入任何背景
+  - Dockerfile 包含 `fonts-noto-cjk` 确保 CJK 字体渲染
+  - 英文 54px / 中文 62px 字体大小，自动换行，底部定位
+
+- [x] QA 审计与安全加固
+  - 三路并行代码审查（前端/API/渲染器），发现 53 个问题
+  - Renderer 修复：路径遍历（`..`）防护、SSRF 私有 IP 拦截、TOCTOU 竞态修复、body size 限制前移、nosniff 头
+  - 前端修复：空输入校验、error role=alert、radio group 语义、aria-describedby、步骤错误展示、非 JSON 响应处理、加载动画
+  - 后端修复：error handler 包裹 try-catch、英文截断用 `.` 而非 `。`、远程错误含响应体
+  - 提交 `3ba3609`
