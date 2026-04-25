@@ -13,7 +13,7 @@ const port = Number(process.env.PORT || 8080);
 const ffmpegBin = process.env.FFMPEG_PATH || "ffmpeg";
 const mediaRoot = process.env.MEDIA_DIR || path.join(__dirname, "media");
 const fontFile = process.env.FONT_FILE || "";
-const fontName = process.env.FONT_NAME || "";
+
 const rendererToken = process.env.RENDERER_TOKEN || process.env.VIDEO_RENDERER_TOKEN || "";
 
 await mkdir(mediaRoot, { recursive: true });
@@ -392,9 +392,6 @@ function extensionForContentType(contentType, url) {
 }
 
 function fontOption() {
-  if (fontName) {
-    return `font=${escapeFilterValue(fontName)}:`;
-  }
   return fontFile ? `fontfile='${escapeFilterPath(fontFile)}':` : "";
 }
 
@@ -402,9 +399,6 @@ function escapeFilterPath(value) {
   return value.replaceAll("\\", "\\\\").replaceAll(":", "\\:").replaceAll("'", "\\'");
 }
 
-function escapeFilterValue(value) {
-  return value.replaceAll(":", "\\:").replaceAll("'", "\\'").replaceAll("[", "\\[").replaceAll("]", "\\]");
-}
 
 function publicBaseUrl(request) {
   if (process.env.PUBLIC_BASE_URL) {

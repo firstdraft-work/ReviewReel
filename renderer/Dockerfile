@@ -8,8 +8,12 @@ RUN apt-get update \
     ca-certificates \
     python3 \
     python3-pip \
+    curl \
   && rm -rf /var/lib/apt/lists/* \
   && pip3 install --no-cache-dir --break-system-packages edge-tts \
+  && mkdir -p /usr/share/fonts/truetype/noto \
+  && curl -sL "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansSC-Regular.otf" \
+    -o /usr/share/fonts/truetype/noto/NotoSansSC-Regular.otf \
   && fc-cache -f
 
 WORKDIR /app
@@ -18,7 +22,7 @@ COPY server.mjs ./
 
 ENV PORT=8080
 ENV FFMPEG_PATH=ffmpeg
-ENV FONT_NAME="Noto Sans CJK SC"
+ENV FONT_FILE=/usr/share/fonts/truetype/noto/NotoSansSC-Regular.otf
 
 EXPOSE 8080
 CMD ["node", "server.mjs"]
