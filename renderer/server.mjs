@@ -220,6 +220,12 @@ async function renderVideo(input, baseUrl) {
 async function renderSegment(options) {
   const assPath = options.textFile.replace(/\.txt$/, ".ass");
   const safeText = (options.subtitle || "").replace(/\n/g, "\\N");
+
+  const isZh = /[一-鿿]/.test(safeText);
+  const fontSize = isZh ? 62 : 54;
+  const lineCount = safeText.split("\\N").length;
+  const marginV = Math.max(60, Math.round(options.height * 0.72) - lineCount * fontSize);
+
   const assContent = [
     "[Script Info]",
     "ScriptType: v4.00+",
@@ -227,8 +233,8 @@ async function renderSegment(options) {
     `PlayResY: ${options.height}`,
     "",
     "[V4+ Styles]",
-    "Format: Name, Fontname, Fontsize, PrimaryColour, BackColour, Bold, Italic, Alignment, MarginL, MarginR, MarginV",
-    `Style: Default,Noto Sans SC,58,&H00FFFFFF,&H00000000,-1,0,2,110,110,30`,
+    "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV",
+    `Style: Default,Noto Sans SC,${fontSize},&H00FFFFFF,&H00000000,&H80000000,&H60000000,-1,0,1,4,2,2,80,80,${marginV}`,
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, Text",
@@ -236,15 +242,13 @@ async function renderSegment(options) {
   ].join("\n");
   await writeFile(assPath, assContent, "utf8");
 
-  const drawBox = "drawbox=x=70:y=1320:w=940:h=360:color=black@0.52:t=fill";
   const subFilter = `subtitles='${escapeFilterPath(assPath)}'`;
-  const vfWithSub = `${drawBox},${subFilter}`;
   const vfCropOnly = `scale=${options.width}:${options.height}:force_original_aspect_ratio=increase,crop=${options.width}:${options.height}`;
 
   if (options.imagePath) {
     await execFfmpegWithTextFallback(
       ["-y", "-loglevel", "error", "-loop", "1", "-t", String(options.seconds),
-        "-i", options.imagePath, "-vf", `${vfCropOnly},${vfWithSub}`,
+        "-i", options.imagePath, "-vf", `${vfCropOnly},${subFilter}`,
         "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", options.outputPath],
       ["-y", "-loglevel", "error", "-loop", "1", "-t", String(options.seconds),
         "-i", options.imagePath, "-vf", vfCropOnly,
@@ -256,7 +260,7 @@ async function renderSegment(options) {
   await execFfmpegWithTextFallback(
     ["-y", "-loglevel", "error", "-f", "lavfi",
       "-i", `color=c=${options.color}:s=${options.width}x${options.height}:d=${options.seconds}:r=24`,
-      "-vf", vfWithSub,
+      "-vf", subFilter,
       "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", options.outputPath],
     ["-y", "-loglevel", "error", "-f", "lavfi",
       "-i", `color=c=${options.color}:s=${options.width}x${options.height}:d=${options.seconds}:r=24`,
