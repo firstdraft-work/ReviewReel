@@ -295,14 +295,10 @@ async function renderSegment(options) {
 
 async function execFfmpegWithTextFallback(args, outputPath, fallbackArgs) {
   try {
-    await execFileAsync(ffmpegBin, args);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "";
-    if (!message.includes("No such filter: 'drawtext'")) {
-      throw error;
-    }
-    console.warn(`drawtext is unavailable; rendering ${path.basename(outputPath)} without subtitles.`);
-    await execFileAsync(ffmpegBin, fallbackArgs);
+    await execFileAsync(ffmpegBin, args, { maxBuffer: 1024 * 1024 * 10 });
+  } catch {
+    console.warn(`drawtext failed; rendering ${path.basename(outputPath)} without subtitles.`);
+    await execFileAsync(ffmpegBin, fallbackArgs, { maxBuffer: 1024 * 1024 * 10 });
   }
 }
 
