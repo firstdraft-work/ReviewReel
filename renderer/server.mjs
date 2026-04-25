@@ -131,6 +131,7 @@ async function renderVideo(input, baseUrl) {
     const width = Number(output.width || 1080);
     const height = Number(output.height || 1920);
     const sceneSeconds = 5;
+    const fadeSeconds = 0.5;
     const subtitles = normalizeSubtitles(input);
     const colors = templateColors(input.templateId);
     const imagePaths = await downloadImages(input.imageUrls ?? [], workDir);
@@ -159,28 +160,15 @@ async function renderVideo(input, baseUrl) {
         subtitle: subtitles[index],
         width,
         height,
-        seconds: sceneSeconds,
+        seconds: sceneSeconds + (index < 2 ? fadeSeconds : 0),
         textFile: path.join(workDir, `subtitle-${index}.txt`),
+        kenBurns: Boolean(imagePaths[index]),
       });
       segmentPaths.push(segmentPath);
     }
 
-    const concatFile = path.join(workDir, "concat.txt");
-    await writeFile(concatFile, segmentPaths.map((segmentPath) => `file '${segmentPath.replaceAll("'", "'\\''")}'`).join("\n"));
-
     const videoOnlyPath = path.join(workDir, "video-only.mp4");
-    await execFileAsync(ffmpegBin, [
-      "-y",
-      "-f",
-      "concat",
-      "-safe",
-      "0",
-      "-i",
-      concatFile,
-      "-c",
-      "copy",
-      videoOnlyPath,
-    ]);
+    await crossfadeSegments(segmentPaths, fadeSeconds, videoOnlyPath);
 
     const outputName = `reviewreel-${id}.mp4`;
     const outputPath = path.join(mediaRoot, outputName);
@@ -250,12 +238,15 @@ async function renderSegment(options) {
   const vfCropOnly = `scale=${options.width}:${options.height}:force_original_aspect_ratio=increase,crop=${options.width}:${options.height}`;
 
   if (options.imagePath) {
+    const zoompan = options.kenBurns
+      ? `zoompan=z='min(zoom+0.0003,1.08)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${options.seconds * 24}:s=${options.width}x${options.height}:fps=24,`
+      : `${vfCropOnly},`;
     await execFfmpegWithTextFallback(
       ["-y", "-loglevel", "error", "-loop", "1", "-t", String(options.seconds),
-        "-i", options.imagePath, "-vf", `${vfCropOnly},${subFilter}`,
+        "-i", options.imagePath, "-vf", `${zoompan}${subFilter}`,
         "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", options.outputPath],
       ["-y", "-loglevel", "error", "-loop", "1", "-t", String(options.seconds),
-        "-i", options.imagePath, "-vf", vfCropOnly,
+        "-i", options.imagePath, "-vf", `${vfCropOnly}`,
         "-r", "24", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", options.outputPath],
     );
     return;
@@ -278,6 +269,44 @@ async function execFfmpegWithTextFallback(args, fallbackArgs) {
   } catch {
     console.warn("Subtitle render failed; retrying without subtitles.");
     await execFileAsync(ffmpegBin, fallbackArgs, { maxBuffer: 1024 * 1024 * 10 });
+  }
+}
+
+async function crossfadeSegments(segmentPaths, fadeDuration, outputPath) {
+  if (segmentPaths.length < 2) {
+    const { rename } = await import("node:fs/promises");
+    await rename(segmentPaths[0], outputPath);
+    return;
+  }
+
+  const args = ["-y", "-loglevel", "error"];
+  for (const seg of segmentPaths) {
+    args.push("-i", seg);
+  }
+
+  const segDuration = 5 + fadeDuration;
+  const offset1 = segDuration - fadeDuration;
+  const offset2 = offset1 + segDuration - fadeDuration;
+
+  const filter = `[0][1]xfade=transition=fade:duration=${fadeDuration}:offset=${offset1}[v01];[v01][2]xfade=transition=fade:duration=${fadeDuration}:offset=${offset2}[vout]`;
+
+  args.push(
+    "-filter_complex", filter,
+    "-map", "[vout]",
+    "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+    outputPath,
+  );
+
+  try {
+    await execFileAsync(ffmpegBin, args, { maxBuffer: 1024 * 1024 * 10 });
+  } catch {
+    console.warn("Crossfade failed; falling back to concat.");
+    const concatFile = outputPath.replace(".mp4", "-concat.txt");
+    await writeFile(concatFile, segmentPaths.map((p) => `file '${p.replaceAll("'", "'\\''")}'`).join("\n"));
+    await execFileAsync(ffmpegBin, [
+      "-y", "-f", "concat", "-safe", "0", "-i", concatFile,
+      "-c", "copy", outputPath,
+    ]);
   }
 }
 

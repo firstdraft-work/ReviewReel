@@ -35,7 +35,7 @@ export default function Home() {
       </section>
 
       <section className="px-6 py-16 border-t border-line">
-        <div className="max-w-4xl mx-auto grid sm:grid-cols-3 gap-8">
+        <div className="max-w-4xl mx-auto grid sm:grid-cols-2 gap-8">
           <Feature
             title="One-click generation"
             description="Enter business name and reviews. Select a template. Click generate. Done."
@@ -45,8 +45,12 @@ export default function Home() {
             description="Native Chinese script, voiceover, and industry-specific copy for local businesses."
           />
           <Feature
+            title="6 templates"
+            description="Bold Food, Clean Service, Warm Local, Neon Night, Minimal Pro, Retro Diner. With smooth crossfade transitions."
+          />
+          <Feature
             title="Upload your photos"
-            description="Add real store images as video backgrounds. Up to 5 photos, auto-cropped to 9:16."
+            description="Add real store images as video backgrounds. Up to 5 photos, with Ken Burns motion effect."
           />
         </div>
       </section>

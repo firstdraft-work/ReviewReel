@@ -18,6 +18,24 @@ describe("getVideoTemplate", () => {
     expect(template.id).toBe("warm-local");
   });
 
+  it("returns neon-night template for neon-night id", () => {
+    const template = getVideoTemplate("neon-night");
+    expect(template.id).toBe("neon-night");
+    expect(template.sceneColors).toHaveLength(3);
+  });
+
+  it("returns minimal-pro template for minimal-pro id", () => {
+    const template = getVideoTemplate("minimal-pro");
+    expect(template.id).toBe("minimal-pro");
+    expect(template.sceneColors).toHaveLength(3);
+  });
+
+  it("returns retro-diner template for retro-diner id", () => {
+    const template = getVideoTemplate("retro-diner");
+    expect(template.id).toBe("retro-diner");
+    expect(template.sceneColors).toHaveLength(3);
+  });
+
   it("returns default template for unknown id", () => {
     const template = getVideoTemplate("nonexistent");
     expect(template.id).toBe(defaultTemplateId);
