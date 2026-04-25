@@ -16,6 +16,10 @@ const fontFile = process.env.FONT_FILE || "";
 
 const rendererToken = process.env.RENDERER_TOKEN || process.env.VIDEO_RENDERER_TOKEN || "";
 
+if (!rendererToken) {
+  console.error("WARNING: RENDERER_TOKEN not set. All requests are unauthenticated.");
+}
+
 await mkdir(mediaRoot, { recursive: true });
 
 createServer(async (request, response) => {
@@ -31,7 +35,7 @@ createServer(async (request, response) => {
     }
 
     if (request.method === "POST" && request.url === "/tts") {
-      if (rendererToken && request.headers.authorization !== `Bearer ${rendererToken}`) {
+      if (!rendererToken || request.headers.authorization !== `Bearer ${rendererToken}`) {
         sendJson(response, 401, { error: "Unauthorized." });
         return;
       }
@@ -46,7 +50,7 @@ createServer(async (request, response) => {
       return;
     }
 
-    if (rendererToken && request.headers.authorization !== `Bearer ${rendererToken}`) {
+    if (!rendererToken || request.headers.authorization !== `Bearer ${rendererToken}`) {
       sendJson(response, 401, { error: "Unauthorized." });
       return;
     }
@@ -386,6 +390,18 @@ function templateColors(templateId) {
 
   if (templateId === "warm-local") {
     return ["#b45309", "#be123c", "#166534"];
+  }
+
+  if (templateId === "neon-night") {
+    return ["#7c3aed", "#db2777", "#0f172a"];
+  }
+
+  if (templateId === "minimal-pro") {
+    return ["#334155", "#0284c7", "#f8fafc"];
+  }
+
+  if (templateId === "retro-diner") {
+    return ["#dc2626", "#ca8a04", "#fef3c7"];
   }
 
   return ["#dc2626", "#7c2d12", "#111827"];

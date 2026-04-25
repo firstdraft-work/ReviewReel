@@ -9,6 +9,16 @@ import type { ReviewScript } from "@/types/video";
 const execFileAsync = promisify(execFile);
 const ffmpegBin = process.env.FFMPEG_PATH || "ffmpeg";
 
+async function fetchWithTimeout(url: string, init: RequestInit, ms = 10_000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 type VoiceoverResult = {
   audioUrl: string;
   provider: string;
@@ -54,7 +64,7 @@ export async function generateVoiceoverFromRenderer(
   const baseUrl = process.env.VIDEO_RENDERER_URL!.replace(/\/+$/, "");
   const ttsUrl = baseUrl.endsWith("/tts") ? baseUrl : `${baseUrl}/tts`;
 
-  const response = await fetch(ttsUrl, {
+  const response = await fetchWithTimeout(ttsUrl, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -93,7 +103,7 @@ async function createRemoteVoiceover(script: string, language: ReviewScript["lan
     throw new Error("Cloud TTS requires TTS_ENDPOINT_URL and TTS_API_KEY.");
   }
 
-  const response = await fetch(process.env.TTS_ENDPOINT_URL!, {
+  const response = await fetchWithTimeout(process.env.TTS_ENDPOINT_URL!, {
     method: "POST",
     headers: {
       "content-type": "application/json",

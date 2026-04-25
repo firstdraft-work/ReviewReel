@@ -54,6 +54,45 @@ export const videoTemplates: Record<VideoTemplateId, VideoTemplate> = {
     panelOpacity: 0.38,
     footer: "made for neighborhood favorites",
   },
+  "neon-night": {
+    id: "neon-night",
+    name: "Neon Night",
+    description: "Vibrant nightlife style with electric purple and hot pink.",
+    sceneColors: ["#7c3aed", "#db2777", "#0f172a"],
+    labels: {
+      en: ["THE SPOT", "PEOPLE ARE TALKING", "COME THROUGH"],
+      zh: ["必去打卡", "口碑炸裂", "今晚就来"],
+    },
+    imageOverlayOpacity: 0.28,
+    panelOpacity: 0.35,
+    footer: "the spot everyone knows",
+  },
+  "minimal-pro": {
+    id: "minimal-pro",
+    name: "Minimal Pro",
+    description: "Clean, modern look with slate and sky blue for professional services.",
+    sceneColors: ["#334155", "#0284c7", "#f8fafc"],
+    labels: {
+      en: ["THE FACTS", "CLIENT RESULTS", "GET STARTED"],
+      zh: ["专业推荐", "客户反馈", "立即咨询"],
+    },
+    imageOverlayOpacity: 0.40,
+    panelOpacity: 0.48,
+    footer: "professional results, real reviews",
+  },
+  "retro-diner": {
+    id: "retro-diner",
+    name: "Retro Diner",
+    description: "Vintage diner vibes with cream, ketchup red, and mustard.",
+    sceneColors: ["#dc2626", "#ca8a04", "#fef3c7"],
+    labels: {
+      en: ["THE CLASSIC", "FIVE-STAR FANS", "DIG IN"],
+      zh: ["老字号", "五星好评", "快去尝尝"],
+    },
+    imageOverlayOpacity: 0.26,
+    panelOpacity: 0.32,
+    footer: "a local classic since day one",
+  },
 };
 
 export const defaultTemplateId: VideoTemplateId = "bold-food";

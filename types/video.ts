@@ -10,7 +10,7 @@ export type ReviewScript = {
 
 export type VideoJobStatus = "pending" | "processing" | "done" | "failed";
 
-export type VideoTemplateId = "bold-food" | "clean-service" | "warm-local";
+export type VideoTemplateId = "bold-food" | "clean-service" | "warm-local" | "neon-night" | "minimal-pro" | "retro-diner";
 
 export type VideoJobStepKey = "script" | "images" | "voice" | "video";
 

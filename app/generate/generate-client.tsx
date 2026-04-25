@@ -28,6 +28,9 @@ const templateOptions: Array<{ id: VideoTemplateId; name: string; description: s
   { id: "bold-food", name: "Bold Food", description: "Punchy food promo" },
   { id: "clean-service", name: "Clean Service", description: "Crisp, professional look" },
   { id: "warm-local", name: "Warm Local", description: "Friendly neighborhood tone" },
+  { id: "neon-night", name: "Neon Night", description: "Electric nightlife vibes" },
+  { id: "minimal-pro", name: "Minimal Pro", description: "Modern, professional services" },
+  { id: "retro-diner", name: "Retro Diner", description: "Vintage diner aesthetic" },
 ];
 
 export function GenerateClient() {
@@ -46,6 +49,7 @@ export function GenerateClient() {
   const [error, setError] = useState("");
   const [storageReady, setStorageReady] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const reviews = useMemo(
     () =>
@@ -110,6 +114,13 @@ export function GenerateClient() {
     }
   }, [videoUrl]);
 
+  useEffect(() => {
+    if (!isGenerating) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  });
+
   async function generate() {
     setError("");
     setScript(null);
@@ -120,22 +131,35 @@ export function GenerateClient() {
     setCompleted([]);
     setActiveStep("script");
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     try {
       const result = await postJson<{ job: VideoJob }>("/api/generate", {
         businessName,
         reviews,
         imageUrls: uploadedImages,
         templateId,
-      });
+      }, controller.signal);
       applyJob(result.job);
       setActiveStep(null);
     } catch (caught) {
       setActiveStep(null);
-      if (caught instanceof ApiError && caught.job) {
-        applyJob(caught.job);
+      if (caught instanceof DOMException && caught.name === "AbortError") {
+        setError("Generation cancelled.");
+      } else {
+        if (caught instanceof ApiError && caught.job) {
+          applyJob(caught.job);
+        }
+        setError(caught instanceof Error ? caught.message : "Generation failed.");
       }
-      setError(caught instanceof Error ? caught.message : "Generation failed.");
+    } finally {
+      abortRef.current = null;
     }
+  }
+
+  function cancelGeneration() {
+    abortRef.current?.abort();
   }
 
   const isGenerating = activeStep !== null;
@@ -308,16 +332,27 @@ export function GenerateClient() {
             <div className="border border-red-700 bg-red-50 p-3 text-sm font-semibold text-red-800" role="alert">{error}</div>
           ) : null}
 
-          <button
-            className="bg-ink h-13 text-base font-black text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-55"
-            disabled={!canGenerate}
-            onClick={() => {
-              void generate();
-            }}
-            type="button"
-          >
-            {isUploading ? "Uploading..." : isGenerating ? <span className="animate-pulse">Generating...</span> : "Generate"}
-          </button>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button
+              className="bg-ink h-13 text-base font-black text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-55"
+              disabled={!canGenerate}
+              onClick={() => {
+                void generate();
+              }}
+              type="button"
+            >
+              {isUploading ? "Uploading..." : isGenerating ? <span className="animate-pulse">Generating...</span> : "Generate"}
+            </button>
+            {isGenerating ? (
+              <button
+                className="border-line h-13 border text-base font-black transition hover:bg-red-50 hover:text-red-800"
+                onClick={cancelGeneration}
+                type="button"
+              >
+                Cancel
+              </button>
+            ) : null}
+          </div>
         </section>
 
         <section className="grid gap-6">
@@ -451,11 +486,12 @@ class ApiError extends Error {
   }
 }
 
-async function postJson<T>(url: string, payload: unknown): Promise<T> {
+async function postJson<T>(url: string, payload: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
+    signal,
   });
 
   let json: T & { error?: string; job?: VideoJob };

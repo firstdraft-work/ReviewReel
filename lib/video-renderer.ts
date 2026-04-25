@@ -46,28 +46,32 @@ export async function renderVideo(input: RenderVideoInput): Promise<RenderVideoR
 async function renderRemoteVideo(input: RenderVideoInput): Promise<RenderVideoResult> {
   const baseUrl = process.env.VIDEO_RENDERER_URL!.replace(/\/+$/, "");
   const renderUrl = baseUrl.endsWith("/render") ? baseUrl : `${baseUrl}/render`;
-  const response = await fetch(renderUrl, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${process.env.VIDEO_RENDERER_TOKEN}`,
-    },
-    body: JSON.stringify({
-      businessName: input.businessName,
-      reviews: input.reviews ?? [],
-      script: input.script,
-      imageUrls: resolveAssetUrls(input.imageUrls, input.baseUrl),
-      audioUrl: input.audioUrl ? resolveAssetUrl(input.audioUrl, input.baseUrl) : "",
-      subtitles: input.subtitles,
-      templateId: input.templateId,
-      output: {
-        width: 1080,
-        height: 1920,
-        durationSeconds: 15,
-        format: "mp4",
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 25_000);
+  let response: Response;
+  try {
+    response = await fetch(renderUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${process.env.VIDEO_RENDERER_TOKEN}`,
       },
-    }),
-  });
+      body: JSON.stringify({
+        businessName: input.businessName,
+        reviews: input.reviews ?? [],
+        script: input.script,
+        imageUrls: resolveAssetUrls(input.imageUrls, input.baseUrl),
+        audioUrl: input.audioUrl ? resolveAssetUrl(input.audioUrl, input.baseUrl) : "",
+        subtitles: input.subtitles,
+        templateId: input.templateId,
+        output: { width: 1080, height: 1920, durationSeconds: 15, format: "mp4" },
+      }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
