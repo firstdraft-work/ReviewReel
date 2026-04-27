@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReviewScript, VideoJob, VideoJobStepStatus, VideoTemplateId } from "@/types/video";
 
@@ -232,6 +233,9 @@ export function GenerateClient() {
 
   return (
     <main className="min-h-screen px-5 py-6 sm:px-8 lg:px-10">
+      <nav className="mb-4">
+        <Link className="text-muted text-sm font-semibold hover:text-black" href="/">&larr; ReviewReel</Link>
+      </nav>
       <section className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[minmax(360px,480px)_1fr]">
         <section
           className="border-line bg-panel flex min-h-[calc(100vh-48px)] flex-col gap-5 border p-5 shadow-sm"
