@@ -1,34 +1,41 @@
+import { getTranslations } from "next-intl/server";
 import Link from "next/link";
+import { LangToggle } from "@/components/LangToggle";
 
-export default function Home() {
+export default async function Home() {
+  const t = await getTranslations("landing");
+  const nav = await getTranslations("nav");
+
   return (
     <main className="min-h-screen flex flex-col">
       <nav className="px-6 py-4 flex items-center justify-between border-b border-line">
-        <span className="text-sm font-bold uppercase tracking-[0.18em] text-muted">ReviewReel</span>
-        <Link
-          href="/generate"
-          className="bg-ink px-5 py-2 text-sm font-bold text-white hover:bg-black transition"
-        >
-          Start Creating
-        </Link>
+        <span className="text-sm font-bold uppercase tracking-[0.18em] text-muted">{nav("brand")}</span>
+        <div className="flex items-center gap-4">
+          <LangToggle />
+          <Link
+            href="/generate"
+            className="bg-ink px-5 py-2 text-sm font-bold text-white hover:bg-black transition"
+          >
+            {nav("startCreating")}
+          </Link>
+        </div>
       </nav>
 
       <section className="flex-1 flex items-center justify-center px-6 py-20">
         <div className="max-w-2xl text-center">
           <h1 className="text-5xl sm:text-6xl font-black leading-[1.08] text-balance">
-            Turn reviews into<br />
-            <span className="text-accent">15-second ads</span>
+            {t("headline")}<br />
+            <span className="text-accent">{t("headlineAccent")}</span>
           </h1>
           <p className="mt-6 text-lg text-muted leading-7 max-w-lg mx-auto">
-            Paste your business name and customer reviews. Upload store photos. Get a ready-to-post
-            vertical marketing video in seconds — no editing skills needed.
+            {t("description")}
           </p>
           <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               href="/generate"
               className="bg-ink px-8 py-4 text-base font-black text-white hover:bg-black transition"
             >
-              Generate Your Video
+              {t("cta")}
             </Link>
           </div>
         </div>
@@ -36,27 +43,15 @@ export default function Home() {
 
       <section className="px-6 py-16 border-t border-line">
         <div className="max-w-4xl mx-auto grid sm:grid-cols-2 gap-8">
-          <Feature
-            title="One-click generation"
-            description="Enter business name and reviews. Select a template. Click generate. Done."
-          />
-          <Feature
-            title="Chinese ready"
-            description="Native Chinese script, voiceover, and industry-specific copy for local businesses."
-          />
-          <Feature
-            title="6 templates"
-            description="Bold Food, Clean Service, Warm Local, Neon Night, Minimal Pro, Retro Diner. With smooth crossfade transitions."
-          />
-          <Feature
-            title="Upload your photos"
-            description="Add real store images as video backgrounds. Up to 5 photos, with Ken Burns motion effect."
-          />
+          <Feature title={t("feature1Title")} description={t("feature1Desc")} />
+          <Feature title={t("feature2Title")} description={t("feature2Desc")} />
+          <Feature title={t("feature3Title")} description={t("feature3Desc")} />
+          <Feature title={t("feature4Title")} description={t("feature4Desc")} />
         </div>
       </section>
 
       <footer className="px-6 py-8 border-t border-line text-center">
-        <p className="text-muted text-sm font-semibold">ReviewReel — Local business video ads, made simple.</p>
+        <p className="text-muted text-sm font-semibold">{t("footer")}</p>
       </footer>
     </main>
   );

@@ -2,39 +2,28 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReviewScript, VideoJob, VideoJobStepStatus, VideoTemplateId } from "@/types/video";
 
 type StepKey = "script" | "images" | "voice" | "video";
 
-type Step = {
-  key: StepKey;
-  label: string;
-};
+const stepKeys: StepKey[] = ["script", "images", "voice", "video"];
 
-const steps: Step[] = [
-  { key: "script", label: "Script" },
-  { key: "images", label: "Images" },
-  { key: "voice", label: "Voiceover" },
-  { key: "video", label: "Video" },
-];
-
-const sampleReviews = [
-  "Five stars. The staff was incredibly friendly and the service was fast.",
-  "Best tacos in the neighborhood. Fresh, flavorful, and always consistent.",
-  "I brought my whole family and everyone loved it. We will be back this week.",
-].join("\n");
-
-const templateOptions: Array<{ id: VideoTemplateId; name: string; description: string }> = [
-  { id: "bold-food", name: "Bold Food", description: "Punchy food promo" },
-  { id: "clean-service", name: "Clean Service", description: "Crisp, professional look" },
-  { id: "warm-local", name: "Warm Local", description: "Friendly neighborhood tone" },
-  { id: "neon-night", name: "Neon Night", description: "Electric nightlife vibes" },
-  { id: "minimal-pro", name: "Minimal Pro", description: "Modern, professional services" },
-  { id: "retro-diner", name: "Retro Diner", description: "Vintage diner aesthetic" },
+const templateIds: VideoTemplateId[] = [
+  "bold-food",
+  "clean-service",
+  "warm-local",
+  "neon-night",
+  "minimal-pro",
+  "retro-diner",
 ];
 
 export function GenerateClient() {
+  const t = useTranslations("generate");
+
+  const sampleReviews = [t("sampleReview1"), t("sampleReview2"), t("sampleReview3")].join("\n");
+
   const [businessName, setBusinessName] = useState("Sunset Tacos");
   const [reviewsText, setReviewsText] = useState(sampleReviews);
   const [script, setScript] = useState<ReviewScript | null>(null);
@@ -75,7 +64,7 @@ export function GenerateClient() {
         setReviewsText(savedReviews);
       }
 
-      if (savedTemplate && templateOptions.some((template) => template.id === savedTemplate)) {
+      if (savedTemplate && templateIds.includes(savedTemplate)) {
         setTemplateId(savedTemplate);
       }
 
@@ -86,26 +75,17 @@ export function GenerateClient() {
   }, []);
 
   useEffect(() => {
-    if (!storageReady) {
-      return;
-    }
-
+    if (!storageReady) return;
     window.localStorage.setItem("reviewreel.businessName", businessName);
   }, [businessName, storageReady]);
 
   useEffect(() => {
-    if (!storageReady) {
-      return;
-    }
-
+    if (!storageReady) return;
     window.localStorage.setItem("reviewreel.reviews", reviewsText);
   }, [reviewsText, storageReady]);
 
   useEffect(() => {
-    if (!storageReady) {
-      return;
-    }
-
+    if (!storageReady) return;
     window.localStorage.setItem("reviewreel.templateId", templateId);
   }, [storageReady, templateId]);
 
@@ -147,12 +127,12 @@ export function GenerateClient() {
     } catch (caught) {
       setActiveStep(null);
       if (caught instanceof DOMException && caught.name === "AbortError") {
-        setError("Generation cancelled.");
+        setError(t("cancelled"));
       } else {
         if (caught instanceof ApiError && caught.job) {
           applyJob(caught.job);
         }
-        setError(caught instanceof Error ? caught.message : "Generation failed.");
+        setError(caught instanceof Error ? caught.message : t("generationFailed"));
       }
     } finally {
       abortRef.current = null;
@@ -173,9 +153,9 @@ export function GenerateClient() {
     setAudioUrl(nextJob.output.audioUrl);
     setVideoUrl(nextJob.output.videoUrl);
     setCompleted(
-      steps
-        .filter((step) => nextJob.steps[step.key].status === "done" || nextJob.steps[step.key].status === "skipped")
-        .map((step) => step.key),
+      stepKeys
+        .filter((key) => nextJob.steps[key].status === "done" || nextJob.steps[key].status === "skipped")
+        .map((key) => key),
     );
   }
 
@@ -184,13 +164,36 @@ export function GenerateClient() {
   }
 
   function formatStepStatus(status: VideoJobStepStatus) {
-    return {
-      queued: "Queued",
-      processing: "Running",
-      done: "Done",
-      failed: "Failed",
-      skipped: "Skipped",
-    }[status];
+    const map: Record<VideoJobStepStatus, string> = {
+      queued: t("statusQueued"),
+      processing: t("statusRunning"),
+      done: t("statusDone"),
+      failed: t("statusFailed"),
+      skipped: t("statusSkipped"),
+    };
+    return map[status];
+  }
+
+  function getStepLabel(key: StepKey) {
+    const map: Record<StepKey, string> = {
+      script: t("stepScript"),
+      images: t("stepImages"),
+      voice: t("stepVoiceover"),
+      video: t("stepVideo"),
+    };
+    return map[key];
+  }
+
+  function getTemplateName(id: VideoTemplateId) {
+    const map: Record<VideoTemplateId, { name: string; desc: string }> = {
+      "bold-food": { name: t("templateBoldFood"), desc: t("templateBoldFoodDesc") },
+      "clean-service": { name: t("templateCleanService"), desc: t("templateCleanServiceDesc") },
+      "warm-local": { name: t("templateWarmLocal"), desc: t("templateWarmLocalDesc") },
+      "neon-night": { name: t("templateNeonNight"), desc: t("templateNeonNightDesc") },
+      "minimal-pro": { name: t("templateMinimalPro"), desc: t("templateMinimalProDesc") },
+      "retro-diner": { name: t("templateRetroDiner"), desc: t("templateRetroDinerDesc") },
+    };
+    return map[id];
   }
 
   async function uploadImages(files: FileList | null) {
@@ -216,16 +219,16 @@ export function GenerateClient() {
       try {
         json = (await response.json()) as { images?: string[]; error?: string };
       } catch {
-        throw new Error(`Upload failed with status ${response.status}.`);
+        throw new Error(t("uploadFailed", { status: response.status }));
       }
 
       if (!response.ok) {
-        throw new Error(json.error ?? "Image upload failed.");
+        throw new Error(json.error ?? t("imageUploadFailed"));
       }
 
       setUploadedImages((current) => [...current, ...(json.images ?? [])].slice(0, 5));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Image upload failed.");
+      setError(caught instanceof Error ? caught.message : t("imageUploadFailed"));
     } finally {
       setIsUploading(false);
     }
@@ -233,47 +236,48 @@ export function GenerateClient() {
 
   return (
     <main className="min-h-screen px-5 py-6 sm:px-8 lg:px-10">
-      <nav className="mb-4">
-        <Link className="text-muted text-sm font-semibold hover:text-black" href="/">&larr; ReviewReel</Link>
+      <nav className="mb-4 flex items-center justify-between">
+        <Link className="text-muted text-sm font-semibold hover:text-black" href="/">{t("backLink")}</Link>
       </nav>
       <section className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[minmax(360px,480px)_1fr]">
         <section
           className="border-line bg-panel flex min-h-[calc(100vh-48px)] flex-col gap-5 border p-5 shadow-sm"
         >
           <div>
-            <p className="text-muted text-sm font-semibold uppercase tracking-[0.18em]">ReviewReel MVP</p>
+            <p className="text-muted text-sm font-semibold uppercase tracking-[0.18em]">{t("brand")}</p>
             <h1 className="mt-2 text-4xl font-black leading-none text-balance sm:text-5xl">
-              Turn reviews into a 15-second vertical ad.
+              {t("headline")}
             </h1>
-            <p className="text-muted mt-3 text-sm font-semibold">Inputs autosave locally while you work.</p>
+            <p className="text-muted mt-3 text-sm font-semibold">{t("autosave")}</p>
           </div>
 
           <label className="grid gap-2">
-            <span className="text-sm font-bold">Business name</span>
+            <span className="text-sm font-bold">{t("businessNameLabel")}</span>
             <input
               className="border-line bg-background h-12 border px-3 outline-none focus:border-black"
               value={businessName}
               onChange={(event) => setBusinessName(event.target.value)}
-              placeholder="Sunset Tacos"
+              placeholder={t("businessNamePlaceholder")}
             />
           </label>
 
           <label className="grid flex-1 gap-2">
-            <span className="text-sm font-bold">Reviews</span>
+            <span className="text-sm font-bold">{t("reviewsLabel")}</span>
             <textarea
               className="border-line bg-background min-h-72 flex-1 resize-none border p-3 leading-6 outline-none focus:border-black"
               value={reviewsText}
               onChange={(event) => setReviewsText(event.target.value)}
-              placeholder="Paste one review per line"
+              placeholder={t("reviewsPlaceholder")}
             />
           </label>
 
           <div className="grid gap-3">
             <div className="grid gap-2">
-              <span className="text-sm font-bold">Template</span>
-              <div className="grid gap-2" role="radiogroup" aria-label="Video template">
-                {templateOptions.map((template) => {
-                  const selected = template.id === templateId;
+              <span className="text-sm font-bold">{t("templateLabel")}</span>
+              <div className="grid gap-2" role="radiogroup" aria-label={t("templateAriaLabel")}>
+                {templateIds.map((id) => {
+                  const selected = id === templateId;
+                  const tpl = getTemplateName(id);
 
                   return (
                     <button
@@ -281,14 +285,14 @@ export function GenerateClient() {
                       className={`border px-3 py-2 text-left transition ${
                         selected ? "border-black bg-black text-white" : "border-line bg-background text-foreground hover:border-black"
                       }`}
-                      key={template.id}
-                      onClick={() => setTemplateId(template.id)}
+                      key={id}
+                      onClick={() => setTemplateId(id)}
                       role="radio"
                       type="button"
                     >
-                      <span className="block text-sm font-black">{template.name}</span>
+                      <span className="block text-sm font-black">{tpl.name}</span>
                       <span className={`block text-xs font-semibold ${selected ? "text-white/75" : "text-muted"}`}>
-                        {template.description}
+                        {tpl.desc}
                       </span>
                     </button>
                   );
@@ -297,7 +301,7 @@ export function GenerateClient() {
             </div>
 
             <label className="grid gap-2">
-              <span className="text-sm font-bold">Store images</span>
+              <span className="text-sm font-bold">{t("storeImagesLabel")}</span>
               <input
                 accept="image/jpeg,image/png,image/webp"
                 aria-describedby="image-help"
@@ -312,19 +316,19 @@ export function GenerateClient() {
               />
             </label>
             <p className="text-muted text-xs font-semibold" id="image-help">
-              Optional. Upload up to 5 JPG, PNG, or WEBP images. The first 3 are used as video backgrounds.
+              {t("imageHelp")}
             </p>
             {uploadedImages.length > 0 ? (
               <div className="grid grid-cols-3 gap-2">
                 {uploadedImages.map((image) => (
                   <div className="border-line bg-background relative aspect-[9/16] overflow-hidden border" key={image}>
-                    <Image alt="Uploaded store image" className="h-full w-full object-cover" height={1920} src={image} width={1080} />
+                    <Image alt={t("uploadedImageAlt")} className="h-full w-full object-cover" height={1920} src={image} width={1080} />
                     <button
                       className="absolute right-1 top-1 bg-black/75 px-2 py-1 text-xs font-black text-white"
                       onClick={() => setUploadedImages((current) => current.filter((item) => item !== image))}
                       type="button"
                     >
-                      Remove
+                      {t("remove")}
                     </button>
                   </div>
                 ))}
@@ -345,7 +349,7 @@ export function GenerateClient() {
               }}
               type="button"
             >
-              {isUploading ? "Uploading..." : isGenerating ? <span className="animate-pulse">Generating...</span> : "Generate"}
+              {isUploading ? t("uploading") : isGenerating ? <span className="animate-pulse">{t("generating")}</span> : t("generate")}
             </button>
             {isGenerating ? (
               <button
@@ -353,7 +357,7 @@ export function GenerateClient() {
                 onClick={cancelGeneration}
                 type="button"
               >
-                Cancel
+                {t("cancel")}
               </button>
             ) : null}
           </div>
@@ -362,18 +366,18 @@ export function GenerateClient() {
         <section className="grid gap-6">
           <div className="border-line bg-panel border p-5">
             <div className="grid gap-3 sm:grid-cols-4">
-              {steps.map((step) => {
-                const state = getStepStatus(step.key);
+              {stepKeys.map((key) => {
+                const state = getStepStatus(key);
 
                 return (
-                  <div className="border-line bg-background min-h-24 border p-3" key={step.key}>
+                  <div className="border-line bg-background min-h-24 border p-3" key={key}>
                     <p className="text-muted text-xs font-bold uppercase tracking-[0.14em]">{formatStepStatus(state)}</p>
-                    <p className="mt-4 text-lg font-black">{step.label}</p>
-                    {job?.steps[step.key].durationMs ? (
-                      <p className="text-muted mt-2 text-xs font-bold">{job.steps[step.key].durationMs}ms</p>
+                    <p className="mt-4 text-lg font-black">{getStepLabel(key)}</p>
+                    {job?.steps[key].durationMs ? (
+                      <p className="text-muted mt-2 text-xs font-bold">{job.steps[key].durationMs}ms</p>
                     ) : null}
-                    {job?.steps[step.key].status === "failed" && job.steps[step.key].error ? (
-                      <p className="mt-1 text-xs font-semibold text-red-700">{job.steps[step.key].error}</p>
+                    {job?.steps[key].status === "failed" && job.steps[key].error ? (
+                      <p className="mt-1 text-xs font-semibold text-red-700">{job.steps[key].error}</p>
                     ) : null}
                   </div>
                 );
@@ -381,10 +385,10 @@ export function GenerateClient() {
             </div>
             {job ? (
               <div className="border-line bg-background mt-4 border p-3 text-sm">
-                <p className="font-black">Job {job.id}</p>
+                <p className="font-black">{t("jobLabel", { id: job.id })}</p>
                 <p className="text-muted mt-1 font-semibold">
-                  Status: {job.status}
-                  {job.metrics.totalMs ? ` / ${job.metrics.totalMs}ms total` : ""}
+                  {t("statusLabel")} {job.status}
+                  {job.metrics.totalMs ? t("totalLabel", { ms: job.metrics.totalMs }) : ""}
                 </p>
               </div>
             ) : null}
@@ -392,24 +396,24 @@ export function GenerateClient() {
 
           <div className="grid gap-6 xl:grid-cols-[360px_1fr]">
             <div className="border-line bg-panel border p-5">
-              <h2 className="text-2xl font-black">Script</h2>
+              <h2 className="text-2xl font-black">{t("scriptHeading")}</h2>
               {script ? (
                 <div className="mt-4 grid gap-4">
-                  <ScriptBlock label="Hook" value={script.hook} />
-                  <ScriptBlock label="Social proof" value={script.socialProof.join("\n")} />
-                  <ScriptBlock label="CTA" value={script.cta} />
+                  <ScriptBlock label={t("scriptHook")} value={script.hook} />
+                  <ScriptBlock label={t("scriptSocialProof")} value={script.socialProof.join("\n")} />
+                  <ScriptBlock label={t("scriptCta")} value={script.cta} />
                 </div>
               ) : (
-                <p className="text-muted mt-4 leading-6">Generated copy appears here as soon as the first step finishes.</p>
+                <p className="text-muted mt-4 leading-6">{t("scriptPlaceholder")}</p>
               )}
             </div>
 
             <div className="border-line bg-panel border p-5" ref={resultRef}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-2xl font-black">Preview</h2>
+                  <h2 className="text-2xl font-black">{t("previewHeading")}</h2>
                   {videoUrl ? (
-                    <p className="text-accent-2 mt-1 text-sm font-black">Video ready. Preview or download below.</p>
+                    <p className="text-accent-2 mt-1 text-sm font-black">{t("videoReady")}</p>
                   ) : null}
                 </div>
                 {videoUrl ? (
@@ -418,7 +422,7 @@ export function GenerateClient() {
                     download
                     href={videoUrl}
                   >
-                    Download MP4
+                    {t("downloadMp4")}
                   </a>
                 ) : null}
               </div>
@@ -427,7 +431,7 @@ export function GenerateClient() {
                 <div className="bg-ink aspect-[9/16] overflow-hidden">
                   {videoUrl ? (
                     <video
-                      aria-label={`Generated marketing video for ${businessName}`}
+                      aria-label={t("videoAriaLabel", { name: businessName })}
                       className="h-full w-full object-cover"
                       controls
                       playsInline
@@ -435,7 +439,7 @@ export function GenerateClient() {
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center p-6 text-center text-sm font-bold text-white/70">
-                      9:16 video preview
+                      {t("videoPlaceholder")}
                     </div>
                   )}
                 </div>
@@ -444,7 +448,7 @@ export function GenerateClient() {
                   {images.length > 0 ? (
                     images.map((image, index) => (
                       <Image
-                        alt={`Generated scene ${index + 1}`}
+                        alt={t("sceneAlt", { number: index + 1 })}
                         className="border-line aspect-[9/16] max-h-52 w-full border object-cover"
                         height={1920}
                         key={image}
@@ -453,12 +457,12 @@ export function GenerateClient() {
                       />
                     ))
                   ) : (
-                    <p className="text-muted leading-6">Scene images and the final MP4 will appear after generation.</p>
+                    <p className="text-muted leading-6">{t("scenesPlaceholder")}</p>
                   )}
                   {audioUrl ? (
                     <div className="text-muted grid gap-1 text-sm">
-                      <p>Voiceover: {job?.output.voiceProvider || "fallback"}</p>
-                      <a className="underline" href={audioUrl} rel="noreferrer" target="_blank">Download voiceover</a>
+                      <p>{t("voiceoverLabel")} {job?.output.voiceProvider || t("voiceoverFallback")}</p>
+                      <a className="underline" href={audioUrl} rel="noreferrer" target="_blank">{t("downloadVoiceover")}</a>
                     </div>
                   ) : null}
                 </div>
