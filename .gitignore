@@ -7,3 +7,4 @@ tsconfig.tsbuildinfo
 public/generated/*
 !public/generated/.gitkeep
 .vercel
+.gstack/
